@@ -1,8 +1,10 @@
-import '../octoprint/octoprint_api.dart';
-import '../util/files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_joystick/flutter_joystick.dart';
 import 'package:scidart/numdart.dart';
+
+import '../octoprint/octoprint_api.dart';
+import '../util/files.dart';
+import 'file_list.dart';
 
 void main() {
   runApp(const MyApp());
@@ -56,6 +58,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool extrudeToggle = false;
   List<String> sentRequests = [];
   double flowRate = 100;
+  String filename = '';
+
   static const _gap = SizedBox(width: 10);
 
   void _extrude(bool value) {
@@ -94,11 +98,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _saveMovements() {
-    saveFile();
+    saveFile('$filename.txt');
   }
 
-  void _getFile() {
-    readFile();
+  void _getFile(String filename) {
+    readFile(filename);
   }
 
   void _clearMovements() {
@@ -182,19 +186,55 @@ class _MyHomePageState extends State<MyHomePage> {
                     child: const Text('Clear movements'),
                   ),
                   ElevatedButton(
+                    child: Text("Save Movements"),
                     onPressed: () {
-                      _saveMovements();
-                      // Respond to button press
+                      showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              scrollable: true,
+                              content: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Form(
+                                  child: Column(
+                                    children: <Widget>[
+                                      TextFormField(
+                                        decoration: InputDecoration(
+                                          labelText: 'File name',
+                                        ),
+                                        onChanged: (text) {
+                                          setState(() {
+                                            filename = text;
+                                          });
+                                          ;
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              actions: [
+                                ElevatedButton(
+                                    child: Text("Save"),
+                                    onPressed: () {
+                                      _saveMovements();
+                                      setState(() {
+                                        filename = '';
+                                      });
+                                    })
+                              ],
+                            );
+                          });
                     },
-                    child: const Text('Save movements'),
                   ),
-                  ElevatedButton(
+                  const FileList(),
+                  /*ElevatedButton(
                     onPressed: () {
                       _getFile();
                       // Respond to button press
                     },
                     child: const Text('Read file'),
-                  ),
+                  ),*/
                 ]),
                 Column(children: [
                   ElevatedButton(

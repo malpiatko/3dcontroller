@@ -1,4 +1,7 @@
+import '../octoprint/octoprint_api.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_joystick/flutter_joystick.dart';
+import 'package:scidart/numdart.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,7 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: '3D Controller',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -24,7 +27,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: '3D Controller'),
     );
   }
 }
@@ -48,16 +51,50 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  double step = 5.0;
+  bool extrudeToggle = false;
+  List<String> sentRequests = [];
+  static const _gap = SizedBox(width: 10);
 
-  void _incrementCounter() {
+  void _extrude(bool value) {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      extrudeToggle = value;
+    });
+  }
+
+  void moveVertically(double z) {
+    var sentCommands = OctoprintAPI().jogCommand(0, 0, -step * z);
+    setState(() {
+      sentRequests.addAll(sentCommands);
+    });
+  }
+
+  void moveHorizontally(double x, double y) {
+    List<String> sentCommands;
+    if (extrudeToggle) {
+      sentCommands = OctoprintAPI().jogExtrudeCommand(
+          step * x, -step * y, 0, hypotenuse(x * step, y * step));
+    } else {
+      sentCommands = OctoprintAPI().jogCommand(step * x, -step * y, 0);
+    }
+
+    setState(() {
+      sentRequests.addAll(sentCommands);
+    });
+  }
+
+  void _repeatSavedMovements() {
+    OctoprintAPI().commands(sentRequests);
+    setState(() {
+      sentRequests = [];
+      extrudeToggle = false;
+    });
+  }
+
+  void _clearMovements() {
+    setState(() {
+      sentRequests = [];
+      extrudeToggle = false;
     });
   }
 
@@ -75,38 +112,70 @@ class _MyHomePageState extends State<MyHomePage> {
         // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: CustomScrollView(
+        primary: false,
+        slivers: <Widget>[
+          SliverPadding(
+            padding: const EdgeInsets.all(20),
+            sliver: SliverGrid.count(
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              crossAxisCount: 2,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.green[100],
+                  child: Row(
+                    //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      const Text('Extrude'),
+                      _gap,
+                      Switch(
+                          value: extrudeToggle,
+                          activeColor: Color(0xFF6200EE),
+                          onChanged: (bool value) {
+                            _extrude(value);
+                          }),
+                    ],
+                  ),
+                ),
+                Column(children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      _repeatSavedMovements();
+                      // Respond to button press
+                    },
+                    child: const Text('Repeat movements'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _clearMovements();
+                      // Respond to button press
+                    },
+                    child: const Text('Clear movements'),
+                  ),
+                ]),
+                Joystick(
+                  mode: JoystickMode.all,
+                  period: const Duration(milliseconds: 100),
+                  listener: (details) {
+                    moveHorizontally(details.x, details.y);
+                  },
+                ),
+                Joystick(
+                  period: const Duration(milliseconds: 100),
+                  mode: JoystickMode.vertical,
+                  listener: (details) {
+                    moveVertically(details.y);
+                  },
+                ),
+              ],
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: () {},
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.

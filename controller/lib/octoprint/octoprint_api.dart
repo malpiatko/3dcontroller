@@ -16,15 +16,23 @@ class OctoprintAPI {
   }
 
   List<String> jogExtrudeCommand(double x, double y, double z, double e) {
-    var cmds = ['G1 X$x Y$y Z$z E$e'];
+    var cmds = ['G91', 'G1 X$x Y$y Z$z E$e'];
     commands(cmds);
     return cmds;
   }
 
   List<String> jogCommand(double x, double y, double z) {
-    var cmds = ['G0 X$x Y$y Z$z'];
+    var cmds = ['G91', 'G0 X$x Y$y Z$z'];
     commands(cmds);
     return cmds;
+  }
+
+  void jobCommand(String command) async {
+    sendRequest('api/job', <String, String>{
+      'command': command,
+      // for pause and restart
+      'action': 'toggle',
+    });
   }
 
   void sendRequest(String url, Map<String, dynamic> body) async {

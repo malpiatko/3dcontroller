@@ -1,4 +1,5 @@
 import '../octoprint/octoprint_api.dart';
+import '../util/files.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_joystick/flutter_joystick.dart';
 import 'package:scidart/numdart.dart';
@@ -54,6 +55,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double step = 5.0;
   bool extrudeToggle = false;
   List<String> sentRequests = [];
+  double flowRate = 100;
   static const _gap = SizedBox(width: 10);
 
   void _extrude(bool value) {
@@ -91,11 +93,23 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _saveMovements() {
+    saveFile();
+  }
+
+  void _getFile() {
+    readFile();
+  }
+
   void _clearMovements() {
     setState(() {
       sentRequests = [];
       extrudeToggle = false;
     });
+  }
+
+  void _jobCommand(String command) {
+    OctoprintAPI().jobCommand(command);
   }
 
   @override
@@ -120,25 +134,38 @@ class _MyHomePageState extends State<MyHomePage> {
             sliver: SliverGrid.count(
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              crossAxisCount: 2,
+              crossAxisCount: 3,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.all(8),
-                  color: Colors.green[100],
-                  child: Row(
-                    //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      const Text('Extrude'),
-                      _gap,
-                      Switch(
-                          value: extrudeToggle,
-                          activeColor: Color(0xFF6200EE),
-                          onChanged: (bool value) {
-                            _extrude(value);
-                          }),
-                    ],
-                  ),
-                ),
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        Row(
+                          //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            const Text('Extrude'),
+                            _gap,
+                            Switch(
+                                value: extrudeToggle,
+                                activeColor: Color(0xFF6200EE),
+                                onChanged: (bool value) {
+                                  _extrude(value);
+                                }),
+                          ],
+                        ),
+                        Text('Flow rate:$flowRate'),
+                        Slider(
+                          min: 50,
+                          max: 200,
+                          value: flowRate,
+                          onChanged: (value) {
+                            setState(() {
+                              flowRate = value;
+                            });
+                          },
+                        )
+                      ],
+                    )),
                 Column(children: [
                   ElevatedButton(
                     onPressed: () {
@@ -154,7 +181,46 @@ class _MyHomePageState extends State<MyHomePage> {
                     },
                     child: const Text('Clear movements'),
                   ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _saveMovements();
+                      // Respond to button press
+                    },
+                    child: const Text('Save movements'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _getFile();
+                      // Respond to button press
+                    },
+                    child: const Text('Read file'),
+                  ),
                 ]),
+                Column(children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      _jobCommand('start');
+                    },
+                    child: const Text('Start'),
+                  ),
+                  _gap,
+                  ElevatedButton(
+                    onPressed: () {
+                      _jobCommand('pause');
+                    },
+                    child: const Text('Pause'),
+                  ),
+                  _gap,
+                  ElevatedButton(
+                    onPressed: () {
+                      _jobCommand('pause');
+                    },
+                    child: const Text('Restart'),
+                  ),
+                ]),
+                Container(
+                  child: Text(sentRequests.toString()),
+                ),
                 Joystick(
                   mode: JoystickMode.all,
                   period: const Duration(milliseconds: 100),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_joystick/flutter_joystick.dart';
 import 'package:scidart/numdart.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' as io;
 
 import '../octoprint/octoprint_api.dart';
 import '../util/files.dart';
-import 'file_list.dart';
 
 void main() {
   runApp(const MyApp());
@@ -56,9 +57,13 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   double step = 5.0;
   bool extrudeToggle = false;
+  bool recordToggle = false;
   List<String> sentRequests = [];
-  double flowRate = 100;
+  double flowRate = 1;
+  double feedRate = 1;
   String filename = '';
+  String fileToRun = '';
+  var files = [];
 
   static const _gap = SizedBox(width: 10);
 
@@ -68,11 +73,19 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _record(bool value) {
+    setState(() {
+      recordToggle = value;
+    });
+  }
+
   void moveVertically(double z) {
     var sentCommands = OctoprintAPI().jogCommand(0, 0, -step * z);
-    setState(() {
-      sentRequests.addAll(sentCommands);
-    });
+    if (recordToggle) {
+      setState(() {
+        sentRequests.addAll(sentCommands);
+      });
+    }
   }
 
   void moveHorizontally(double x, double y) {
@@ -84,13 +97,17 @@ class _MyHomePageState extends State<MyHomePage> {
       sentCommands = OctoprintAPI().jogCommand(step * x, -step * y, 0);
     }
 
-    setState(() {
-      sentRequests.addAll(sentCommands);
-    });
+    if (recordToggle) {
+      setState(() {
+        sentRequests.addAll(sentCommands);
+      });
+    }
   }
 
-  void _repeatSavedMovements() {
-    OctoprintAPI().commands(sentRequests);
+  void _repeatSavedMovements() async {
+    var file = await readFile('$fileToRun.txt');
+    print(file);
+    OctoprintAPI().commands(file.split(', '));
     setState(() {
       sentRequests = [];
       extrudeToggle = false;
@@ -98,7 +115,27 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _saveMovements() {
-    saveFile('$filename.txt');
+    print(filename);
+    String movements = sentRequests.join(', ');
+    saveToFile('$filename.txt', movements);
+    setState(() {
+      filename = '';
+      sentRequests = [];
+    });
+  }
+
+  void _changeFeedRate(double value) {
+    setState(() {
+      feedRate = value;
+    });
+    OctoprintAPI().changeFeedRate(value);
+  }
+
+  void _changeFlowRate(double value) {
+    setState(() {
+      flowRate = value;
+    });
+    OctoprintAPI().changeFlowRate(value);
   }
 
   void _getFile(String filename) {
@@ -116,8 +153,17 @@ class _MyHomePageState extends State<MyHomePage> {
     OctoprintAPI().jobCommand(command);
   }
 
+  void _listofFiles() async {
+    var directory = (await getApplicationDocumentsDirectory()).path;
+    setState(() {
+      files = io.Directory(directory)
+          .listSync(); //use your folder name insted of resume.
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _listofFiles();
     // This method is rerun every time setState is called, for instance as done
     // by the _incrementCounter method above.
     //
@@ -132,9 +178,10 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: CustomScrollView(
         primary: false,
+        physics: const NeverScrollableScrollPhysics(),
         slivers: <Widget>[
           SliverPadding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(10),
             sliver: SliverGrid.count(
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
@@ -159,25 +206,65 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                         Text('Flow rate:$flowRate'),
                         Slider(
-                          min: 50,
-                          max: 200,
+                          min: 0.75,
+                          max: 1.25,
                           value: flowRate,
-                          onChanged: (value) {
+                          onChanged: (value) {},
+                          onChangeEnd: (value) {
+                            _changeFlowRate(value);
                             setState(() {
                               flowRate = value;
                             });
+                          },
+                        ),
+                        Text('Feed rate:$feedRate'),
+                        Slider(
+                          min: 0.5,
+                          max: 2,
+                          value: feedRate,
+                          onChanged: (value) {},
+                          onChangeEnd: (value) {
+                            _changeFeedRate(value);
                           },
                         )
                       ],
                     )),
                 Column(children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      _repeatSavedMovements();
-                      // Respond to button press
-                    },
-                    child: const Text('Repeat movements'),
+                  Row(
+                    //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      const Text('Record movement'),
+                      _gap,
+                      Switch(
+                          value: recordToggle,
+                          activeColor: Color(0xFF6200EE),
+                          onChanged: (bool value) {
+                            _record(value);
+                          }),
+                    ],
                   ),
+                  Row(children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          labelText: 'File to run',
+                        ),
+                        onChanged: (text) {
+                          setState(() {
+                            fileToRun = text;
+                          });
+                          ;
+                        },
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _repeatSavedMovements();
+                        // Respond to button press
+                      },
+                      child: const Text('Repeat movements'),
+                    ),
+                  ]),
                   ElevatedButton(
                     onPressed: () {
                       _clearMovements();
@@ -218,16 +305,21 @@ class _MyHomePageState extends State<MyHomePage> {
                                     child: Text("Save"),
                                     onPressed: () {
                                       _saveMovements();
-                                      setState(() {
-                                        filename = '';
-                                      });
                                     })
                               ],
                             );
                           });
                     },
                   ),
-                  const FileList(),
+                  const Text('Saved files'),
+                  Expanded(
+                    child: ListView.builder(
+                        itemCount: files.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          return Text(
+                              basenameWithoutExtension(files[index].path));
+                        }),
+                  ),
                   /*ElevatedButton(
                     onPressed: () {
                       _getFile();
@@ -259,7 +351,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ]),
                 Container(
-                  child: Text(sentRequests.toString()),
+                  child: Text(sentRequests.join(', ')),
                 ),
                 Joystick(
                   mode: JoystickMode.all,

@@ -15,8 +15,18 @@ class OctoprintAPI {
     });
   }
 
+  void changeFeedRate(double rate) async {
+    sendRequest('/api/printer/printhead',
+        <String, dynamic>{"command": "feedrate", "factor": rate});
+  }
+
+  void changeFlowRate(double rate) async {
+    sendRequest('/api/printer/tool',
+        <String, dynamic>{"command": "flowrate", "factor": rate});
+  }
+
   List<String> jogExtrudeCommand(double x, double y, double z, double e) {
-    var cmds = ['G91', 'G1 X$x Y$y Z$z E$e'];
+    var cmds = ['G91', 'G1 X$x Y$y Z$z E$e F1000'];
     commands(cmds);
     return cmds;
   }
@@ -36,14 +46,15 @@ class OctoprintAPI {
   }
 
   void sendRequest(String url, Map<String, dynamic> body) async {
-    final response = await http.post(Uri.parse('http://localhost:9000/' + url),
-        // Send authorization headers to the backend.
-        headers: <String, String>{
-          HttpHeaders.authorizationHeader:
-              'Bearer 2004F053D4C44F0486C101ABD495A6A2',
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(body));
+    final response =
+        await http.post(Uri.parse('http://raspberrypi.local:5000/' + url),
+            // Send authorization headers to the backend.
+            headers: <String, String>{
+              HttpHeaders.authorizationHeader:
+                  'Bearer B4C94C14478D4C718D184847677DA64F',
+              'Content-Type': 'application/json; charset=UTF-8',
+            },
+            body: jsonEncode(body));
 
     print(response.statusCode);
     if (response.statusCode != 204) {

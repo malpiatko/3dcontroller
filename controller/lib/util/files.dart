@@ -10,15 +10,14 @@ Future<String> getFilePath(String filename) async {
   return filePath;
 }
 
-void saveFile(String filename) async {
+void saveToFile(String filename, String content) async {
   File file = File(await getFilePath(filename)); // 1
-  file.writeAsString(
-      "This is my demo text that will be saved to : demoTextFile.txt"); // 2
+  file.writeAsString(content); // 2
 }
 
-void readFile(String filename) async {
+Future<String> readFile(String filename) async {
   File file = File(await getFilePath(filename)); // 1
   String fileContent = await file.readAsString(); // 2
-
   print('File Content: $fileContent');
+  return fileContent;
 }
